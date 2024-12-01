@@ -32,7 +32,7 @@ def check_and_install_packages():
     
     # Check if packages are installed (works for RPM-based systems like CentOS, RHEL)
     for package in REQUIRED_PACKAGES:
-        result = subprocess.run(f"rpm -q {package}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(f"dnf list installed {package}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
             missing_packages.append(package)
 
@@ -68,8 +68,11 @@ def clean_old_kernel_headers():
     run_command("dnf remove -y $(dnf repoquery --installonly --latest-limit=-1 -q)")
     print("Old kernel headers cleaned up.")
 
-def download_iso(iso_url, iso_file):
+def check_download_iso(iso_url, iso_file):
     """Download the ISO file."""
+    if os.path.exists(iso_file):
+        print("VirtualBox Guest Additions ISO exists, deleting.")
+        os.remove(iso_file)
     print("Downloading VirtualBox Guest Additions ISO...")
     run_command(f"wget -q {iso_url} -O {iso_file}")
 

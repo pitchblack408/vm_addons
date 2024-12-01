@@ -126,7 +126,7 @@ def prompt_reboot():
 
 def main():
     parser = argparse.ArgumentParser(description="Install VirtualBox Guest Additions ISO.")
-    parser.add_argument('--virtual-box-version', type=str, required=True, help="The version of VirtualBox manager.")
+    parser.add_argument('-b', '--virtual-box-version', type=str, required=True, help="The version of VirtualBox manager.")
 
     args = parser.parse_args()
     iso_url = f"https://download.virtualbox.org/virtualbox/{args.virtual_box_version}/VBoxGuestAdditions_{args.virtual_box_version}.iso"

@@ -68,7 +68,7 @@ def clean_old_kernel_headers():
     run_command("dnf remove -y $(dnf repoquery --installonly --latest-limit=-1 -q)")
     print("Old kernel headers cleaned up.")
 
-def check_download_iso(iso_url, iso_file):
+def check_and_download_iso(iso_url, iso_file):
     """Download the ISO file."""
     if os.path.exists(iso_file):
         print("VirtualBox Guest Additions ISO exists, deleting.")
@@ -139,7 +139,7 @@ def main():
     if not are_kernel_headers_installed():
         install_kernel_headers()  # Kernel headers installation check
         clean_old_kernel_headers()  # Clean up old kernel headers and development files
-    download_iso(iso_url, iso_file)
+    check_and_download_iso(iso_url, iso_file)
     create_directories(mount_dir, target_dir)
     mount_iso(iso_file, mount_dir)
     copy_contents(mount_dir, target_dir)

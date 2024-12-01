@@ -10,21 +10,6 @@ REQUIRED_PACKAGES = [
     "m4", "make", "openssl-devel", "zlib-devel"
 ]
 
-class VirtualBoxAddonsInstallException(Exception):
-    def __init__(self, message):
-        self.message = message
-
-    def __str__(self):
-        return self.message
-
-
-class VirtualBoxAddonsFileNotFoundException(VirtualBoxAddonsInstallException):
-    def __init__(self, message):
-        self.message = message
-
-    def __str__(self):
-        return self.message
-
 def ensure_root():
     """Ensure the script is run as root."""
     if os.geteuid() != 0:
@@ -39,17 +24,41 @@ def run_command(command, check=True):
         sys.exit(1)
     return result
 
-def install_required_packages():
-    """Install required packages."""
-    print(f"Attempting to install required packages: {', '.join(REQUIRED_PACKAGES)}")
-    run_command(f"dnf install -y {' '.join(REQUIRED_PACKAGES)}")
+def check_and_install_packages():
+    """Check if required packages are installed, install missing ones."""
+    print("Checking for required packages...")
 
-def install_kernel_headers(kernel_version):
+    missing_packages = []
+    
+    # Check if packages are installed (works for RPM-based systems like CentOS, RHEL)
+    for package in REQUIRED_PACKAGES:
+        result = subprocess.run(f"rpm -q {package}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            missing_packages.append(package)
+
+    if missing_packages:
+        print(f"The following packages are missing: {', '.join(missing_packages)}")
+        print("Attempting to install missing packages...")
+        run_command(f"dnf install -y {' '.join(missing_packages)}")
+
+def are_kernel_headers_installed():
+    """Check if kernel headers are installed."""
+    print("Checking for kernel headers...")
+    # Get the current kernel version
+    kernel_version = subprocess.check_output("uname -r", shell=True).decode().strip()
+    # Check if kernel-devel and kernel-headers are installed
+    result = subprocess.run(f"dnf list installed kernel-devel-{kernel_version} kernel-headers-{kernel_version}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        return True
+    else:
+       return False
+
+def install_kernel_headers():
     """Install kernal headers."""
+    # Get the current kernel version
+    kernel_version = subprocess.check_output("uname -r", shell=True).decode().strip()
     print("Kernel headers or development files not found. Installing...")
     run_command(f"dnf install -y kernel-devel-{kernel_version} kernel-headers-{kernel_version}")
-    command = f"dnf install -y kernel-devel-{kernel_version} kernel-headers-{kernel_version}"
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 def clean_old_kernel_headers():
     """Remove old kernel headers and development files."""
@@ -112,8 +121,6 @@ def prompt_reboot():
     else:
         print("Reboot skipped.")
 
-    
-
 def main():
     parser = argparse.ArgumentParser(description="Install VirtualBox Guest Additions ISO.")
     parser.add_argument('--virtual-box-version', type=str, required=True, help="The version of VirtualBox manager.")
@@ -125,37 +132,19 @@ def main():
     target_dir = f"/tmp/VBox_GA"
     
     ensure_root()
-    install_required_packages()
+    check_and_install_packages()
+    if not are_kernel_headers_installed():
+        install_kernel_headers()  # Kernel headers installation check
+        clean_old_kernel_headers()  # Clean up old kernel headers and development files
     download_iso(iso_url, iso_file)
     create_directories(mount_dir, target_dir)
     mount_iso(iso_file, mount_dir)
     copy_contents(mount_dir, target_dir)
     unmount_iso(mount_dir)
-    
-    try:
-        print("Attempting to install addons with existing kernal headers.")
-        run_guest_additions(target_dir)
-    except VirtualBoxAddonsFileNotFoundException as e:
-        print(e, file=sys.stderr)
-    except VirtualBoxAddonsInstallException:
-        # Get the current kernel version
-        kernel_version = subprocess.check_output("uname -r", shell=True).decode().strip()
-        print(f"Failed to install with existing kernal headers. Installing headers for kernal {kernel_version}")
-        install_kernel_headers(kernel_version)  # Kernel headers installation
-        clean_old_kernel_headers()  # Clean up old kernel headers and development files
-        print(f"Attempting to install addons with kernal {kernel_version} headers.")
-        try:
-            run_guest_additions(target_dir)
-        except VirtualBoxAddonsInstallException:
-            print(f"Failed to install addons with kernal {kernel_version} headers. Exiting...")
-            sys.exit(1)
-
+    run_guest_additions(target_dir)
     clean_up(mount_dir, target_dir, iso_file)
     prompt_reboot()
     print("Done!")
-
-
-
 
 
 if __name__ == "__main__":
